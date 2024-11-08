@@ -1,0 +1,60 @@
+---
+name: code verification
+on:   # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - "master"
+  pull_request: {}
+
+env:
+  CARGO_INCREMENTAL: 0
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
+  IN_CI: "true"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo and build scripts
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Run sccache
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Build
+        run: cargo build
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo and build scripts
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Run sccache
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: rustfmt nightly
+        run: |
+          rustup toolchain install nightly-x86_64-unknown-linux-gnu
+          rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install poetry
+        uses: snok/install-poetry@v1
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo and build scripts
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Run sccache
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Test
+        run: cargo test
