@@ -26,7 +26,8 @@
 //! { "foo": {"bar": 1}}
 //! ```
 
-pub mod errors;
+mod errors;
+mod macros;
 
 use json_patch::patch;
 // mark these as re-exports in the generated docs (maybe related to
@@ -36,13 +37,16 @@ pub use json_patch::{
     AddOperation,
     CopyOperation,
     MoveOperation,
+    Patch,
     PatchOperation,
     RemoveOperation,
     ReplaceOperation,
     TestOperation,
 };
+#[doc(no_inline)]
 use jsonptr::index::Index;
-use jsonptr::{
+use jsonptr::Token;
+pub use jsonptr::{
     Pointer,
     PointerBuf,
 };
@@ -51,7 +55,7 @@ use serde_json::{
     Value,
 };
 
-use crate::errors::PatchError;
+pub use crate::errors::PatchError;
 
 // PatchMode controls what to do if the referenced element does not exist in the object.
 #[derive(Debug, Clone, Copy)]
@@ -59,6 +63,34 @@ enum PatchMode {
     Error,
     Create,
     Skip,
+}
+
+pub fn add_operation(path: PointerBuf, value: Value) -> PatchOperation {
+    PatchOperation::Add(AddOperation { path, value })
+}
+
+pub fn replace_operation(path: PointerBuf, value: Value) -> PatchOperation {
+    PatchOperation::Replace(ReplaceOperation { path, value })
+}
+
+pub fn remove_operation(path: PointerBuf) -> PatchOperation {
+    PatchOperation::Remove(RemoveOperation { path })
+}
+
+pub fn move_operation(from: PointerBuf, path: PointerBuf) -> PatchOperation {
+    PatchOperation::Move(MoveOperation { from, path })
+}
+
+pub fn copy_operation(from: PointerBuf, path: PointerBuf) -> PatchOperation {
+    PatchOperation::Copy(CopyOperation { from, path })
+}
+
+pub fn test_operation(path: PointerBuf, value: Value) -> PatchOperation {
+    PatchOperation::Test(TestOperation { path, value })
+}
+
+pub fn escape(input: &str) -> String {
+    Token::new(input).encoded().into()
 }
 
 pub fn patch_ext(obj: &mut Value, p: PatchOperation) -> Result<(), PatchError> {
@@ -175,10 +207,10 @@ fn patch_ext_helper<'a>(
 #[cfg(test)]
 mod tests {
     use assertables::*;
-    use jsonptr::PointerBuf;
     use rstest::*;
 
     use super::*;
+    use crate as json_patch_ext; // make the macros work in the tests
 
     #[fixture]
     fn data() -> Value {
@@ -193,8 +225,8 @@ mod tests {
 
     #[rstest]
     fn test_patch_ext_add(mut data: Value) {
-        let path = PointerBuf::parse("/foo/*/baz/buzz").unwrap();
-        let res = patch_ext(&mut data, PatchOperation::Add(AddOperation { path, value: json!(42) }));
+        let path = format_ptr!("/foo/*/baz/buzz");
+        let res = patch_ext(&mut data, add_operation(path, json!(42)));
         assert_ok!(res);
         assert_eq!(
             data,
@@ -209,9 +241,18 @@ mod tests {
     }
 
     #[rstest]
+    fn test_patch_ext_add_escaped() {
+        let path = format_ptr!("/foo/bar/{}", escape("testing.sh/baz"));
+        let mut data = json!({});
+        let res = patch_ext(&mut data, add_operation(path, json!(42)));
+        assert_ok!(res);
+        assert_eq!(data, json!({"foo": {"bar": {"testing.sh/baz": 42}}}));
+    }
+
+    #[rstest]
     fn test_patch_ext_replace(mut data: Value) {
-        let path = PointerBuf::parse("/foo/*/baz").unwrap();
-        let res = patch_ext(&mut data, PatchOperation::Replace(ReplaceOperation { path, value: json!(42) }));
+        let path = format_ptr!("/foo/*/baz");
+        let res = patch_ext(&mut data, replace_operation(path, json!(42)));
         assert_ok!(res);
         assert_eq!(
             data,
@@ -227,8 +268,8 @@ mod tests {
 
     #[rstest]
     fn test_patch_ext_replace_err(mut data: Value) {
-        let path = PointerBuf::parse("/foo/*/baz/buzz").unwrap();
-        let res = patch_ext(&mut data, PatchOperation::Replace(ReplaceOperation { path, value: json!(42) }));
+        let path = format_ptr!("/foo/*/baz/buzz");
+        let res = patch_ext(&mut data, replace_operation(path, json!(42)));
         println!("{data:?}");
         assert_err!(res);
     }
@@ -236,8 +277,8 @@ mod tests {
 
     #[rstest]
     fn test_patch_ext_remove(mut data: Value) {
-        let path = PointerBuf::parse("/foo/*/baz/quzz").unwrap();
-        let res = patch_ext(&mut data, PatchOperation::Remove(RemoveOperation { path }));
+        let path = format_ptr!("/foo/*/baz/quzz");
+        let res = patch_ext(&mut data, remove_operation(path));
         assert_ok!(res);
         assert_eq!(
             data,
