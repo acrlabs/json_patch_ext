@@ -1,7 +1,11 @@
 [package]
 name = "json-patch-ext"
+authors = ["Applied Computing Research Labs"]
 version = "0.1.0"
 edition = "2021"
+description = "Unofficial extensions and helpers for json_patch"
+license-file = "LICENSE"
+readme = "README.md"
 
 [dependencies]
 json-patch = "3"
