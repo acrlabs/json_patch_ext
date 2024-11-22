@@ -57,6 +57,31 @@ use serde_json::{
 
 pub use crate::errors::PatchError;
 
+pub mod prelude {
+    pub use super::{
+        add_operation,
+        copy_operation,
+        escape,
+        format_ptr,
+        move_operation,
+        patch_ext,
+        remove_operation,
+        replace_operation,
+        test_operation,
+        AddOperation,
+        CopyOperation,
+        MoveOperation,
+        Patch,
+        PatchError,
+        PatchOperation,
+        Pointer,
+        PointerBuf,
+        RemoveOperation,
+        ReplaceOperation,
+        TestOperation,
+    };
+}
+
 // PatchMode controls what to do if the referenced element does not exist in the object.
 #[derive(Debug, Clone, Copy)]
 enum PatchMode {
@@ -69,20 +94,20 @@ pub fn add_operation(path: PointerBuf, value: Value) -> PatchOperation {
     PatchOperation::Add(AddOperation { path, value })
 }
 
-pub fn replace_operation(path: PointerBuf, value: Value) -> PatchOperation {
-    PatchOperation::Replace(ReplaceOperation { path, value })
-}
-
-pub fn remove_operation(path: PointerBuf) -> PatchOperation {
-    PatchOperation::Remove(RemoveOperation { path })
+pub fn copy_operation(from: PointerBuf, path: PointerBuf) -> PatchOperation {
+    PatchOperation::Copy(CopyOperation { from, path })
 }
 
 pub fn move_operation(from: PointerBuf, path: PointerBuf) -> PatchOperation {
     PatchOperation::Move(MoveOperation { from, path })
 }
 
-pub fn copy_operation(from: PointerBuf, path: PointerBuf) -> PatchOperation {
-    PatchOperation::Copy(CopyOperation { from, path })
+pub fn remove_operation(path: PointerBuf) -> PatchOperation {
+    PatchOperation::Remove(RemoveOperation { path })
+}
+
+pub fn replace_operation(path: PointerBuf, value: Value) -> PatchOperation {
+    PatchOperation::Replace(ReplaceOperation { path, value })
 }
 
 pub fn test_operation(path: PointerBuf, value: Value) -> PatchOperation {
