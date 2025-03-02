@@ -45,10 +45,10 @@ pub use json_patch::{
 };
 #[doc(no_inline)]
 use jsonptr::index::Index;
-use jsonptr::Token;
 pub use jsonptr::{
     Pointer,
     PointerBuf,
+    Token,
 };
 use serde_json::{
     json,
@@ -63,6 +63,7 @@ pub mod prelude {
         copy_operation,
         escape,
         format_ptr,
+        matches,
         move_operation,
         patch_ext,
         remove_operation,
@@ -79,6 +80,7 @@ pub mod prelude {
         RemoveOperation,
         ReplaceOperation,
         TestOperation,
+        Token,
     };
 }
 
@@ -116,6 +118,48 @@ pub fn test_operation(path: PointerBuf, value: Value) -> PatchOperation {
 
 pub fn escape(input: &str) -> String {
     Token::new(input).encoded().into()
+}
+
+pub fn matches<'a>(path: &Pointer, value: &'a Value) -> Vec<(PointerBuf, &'a Value)> {
+    let Some(idx) = path.as_str().find("/*") else {
+        // Base case -- no stars;
+        // If we can't resolve, there's no match to be found
+        if let Ok(v) = path.resolve(value) {
+            return vec![(path.to_buf(), v)];
+        } else {
+            return vec![];
+        }
+    };
+
+    // we checked the index above so unwrap is safe here
+    let (head, cons) = path.split_at(idx).unwrap();
+    let mut res = vec![];
+
+    // If we can't resolve the head, or it's not an array, no match found
+    let Ok(head_val) = head.resolve(value) else {
+        return vec![];
+    };
+    let Some(next_array_val) = head_val.as_array() else {
+        return vec![];
+    };
+
+    println!("{cons}");
+    for (i, v) in next_array_val.iter().enumerate() {
+        // /1 is a valid pointer so the unwrap below is fine
+        let idx_str = format!("/{i}");
+        let idx_path = PointerBuf::parse(&idx_str).unwrap();
+
+        // The cons pointer either looks like /* or /*/something, so we need to split_front
+        // to get the array marker out, and either return the current path if there's nothing
+        // else, or recurse and concatenate the subpath(s) to the head
+        if let Some((_, c)) = cons.split_front() {
+            let subpaths = matches(c, v);
+            res.extend(subpaths.iter().map(|(p, v)| (head.concat(&idx_path.concat(p)), *v)));
+        } else {
+            panic!("cons can't be root");
+        }
+    }
+    res
 }
 
 pub fn patch_ext(obj: &mut Value, p: PatchOperation) -> Result<(), PatchError> {
@@ -217,13 +261,20 @@ fn patch_ext_helper<'a>(
             PatchMode::Skip => return Ok(vec![]),
         }
     }
+
+    // Head now points at what we believe is an array; if not, it's an error.
     let next_array_val =
         head.resolve_mut(value)?.as_array_mut().ok_or(PatchError::UnexpectedType(head.as_str().into()))?;
+
+    // Iterate over all the array values and recurse, returning all found values
     for v in next_array_val {
+        // The cons pointer either looks like /* or /*/something, so we need to split_front
+        // to get the array marker out, and either return the current value if there's nothing
+        // else, or recurse and return all the found values
         if let Some((_, c)) = cons.split_front() {
             res.extend(patch_ext_helper(c, v, mode)?);
         } else {
-            res.push(v);
+            panic!("cons can't be root");
         }
     }
     Ok(res)
@@ -246,6 +297,54 @@ mod tests {
                 {"baz": {"fixx": 2}},
             ],
         })
+    }
+
+    #[rstest]
+    fn test_matches_1(data: Value) {
+        let path = format_ptr!("/foo");
+        let m: Vec<_> = matches(&path, &data).iter().map(|(p, _)| p.clone()).collect();
+        assert_eq!(m, vec![format_ptr!("/foo")]);
+    }
+
+    #[rstest]
+    fn test_matches_2(data: Value) {
+        let path = format_ptr!("/foo/*/baz");
+        let m: Vec<_> = matches(&path, &data).iter().map(|(p, _)| p.clone()).collect();
+        assert_eq!(m, vec![format_ptr!("/foo/0/baz"), format_ptr!("/foo/1/baz"), format_ptr!("/foo/2/baz")]);
+    }
+
+    #[rstest]
+    fn test_matches_3(data: Value) {
+        let path = format_ptr!("/foo/*");
+        let m: Vec<_> = matches(&path, &data).iter().map(|(p, _)| p.clone()).collect();
+        assert_eq!(m, vec![format_ptr!("/foo/0"), format_ptr!("/foo/1"), format_ptr!("/foo/2")]);
+    }
+
+    #[rstest]
+    #[case(format_ptr!("/foo/*/baz/fixx"))]
+    #[case(format_ptr!("/foo/2/baz/fixx"))]
+    fn test_matches_4(#[case] path: PointerBuf, data: Value) {
+        let m: Vec<_> = matches(&path, &data).iter().map(|(p, _)| p.clone()).collect();
+        assert_eq!(m, vec![format_ptr!("/foo/2/baz/fixx")]);
+    }
+
+    #[rstest]
+    fn test_matches_root() {
+        let path = format_ptr!("/*");
+        let data = json!(["foo", "bar"]);
+        let m: Vec<_> = matches(&path, &data).iter().map(|(p, _)| p.clone()).collect();
+        assert_eq!(m, vec![format_ptr!("/0"), format_ptr!("/1")]);
+    }
+
+    #[rstest]
+    #[case(format_ptr!("/*"))]
+    #[case(format_ptr!("/food"))]
+    #[case(format_ptr!("/foo/3/baz"))]
+    #[case(format_ptr!("/foo/bar/baz"))]
+    #[case(format_ptr!("/foo/0/baz/fixx"))]
+    fn test_no_match(#[case] path: PointerBuf, data: Value) {
+        let m = matches(&path, &data);
+        assert_is_empty!(m);
     }
 
     #[rstest]
@@ -298,7 +397,6 @@ mod tests {
         println!("{data:?}");
         assert_err!(res);
     }
-
 
     #[rstest]
     fn test_patch_ext_remove(mut data: Value) {
