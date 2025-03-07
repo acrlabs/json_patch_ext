@@ -1,0 +1,6 @@
+[build]
+target-dir = ".build"
+
+[profile.test-cover]
+inherits = "test"
+incremental = false
