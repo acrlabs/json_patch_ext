@@ -1,7 +1,7 @@
 [package]
 name = "json-patch-ext"
 authors = ["Applied Computing Research Labs"]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Unofficial extensions and helpers for json_patch"
 license = "MIT"

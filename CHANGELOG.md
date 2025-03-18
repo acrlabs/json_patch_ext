@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 Breaking changes are annotated with the ⚠️ symbol.
+## 0.2.1 - 2025-03-18
+
+### 🐛 Bug Fixes
+
+- Remove print statement
+
 
 ## v0.2.0 - 2025-03-09
 
