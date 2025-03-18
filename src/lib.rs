@@ -143,7 +143,6 @@ pub fn matches<'a>(path: &Pointer, value: &'a Value) -> Vec<(PointerBuf, &'a Val
         return vec![];
     };
 
-    println!("{cons}");
     for (i, v) in next_array_val.iter().enumerate() {
         // /1 is a valid pointer so the unwrap below is fine
         let idx_str = format!("/{i}");
