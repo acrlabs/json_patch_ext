@@ -184,7 +184,7 @@ fn add_or_replace(obj: &mut Value, path: &PointerBuf, value: &Value, replace: bo
             Value::Object(map) => {
                 let key = tail.decoded().into();
                 if replace && !map.contains_key(&key) {
-                    return Err(PatchError::TargetDoesNotExist(path.as_str().into()));
+                    return Err(PatchError::TargetDoesNotExist(path.to_string()));
                 }
                 map.insert(key, value.clone());
             },
@@ -202,7 +202,7 @@ fn add_or_replace(obj: &mut Value, path: &PointerBuf, value: &Value, replace: bo
                 },
             },
             _ => {
-                return Err(PatchError::UnexpectedType(path.as_str().into()));
+                return Err(PatchError::UnexpectedType(path.to_string()));
             },
         }
     }
@@ -216,9 +216,22 @@ fn remove(obj: &mut Value, path: &PointerBuf) -> Result<(), PatchError> {
     };
 
     for v in patch_ext_helper(subpath, obj, PatchMode::Skip)? {
-        v.as_object_mut()
-            .ok_or(PatchError::UnexpectedType(subpath.as_str().into()))?
-            .remove(key.decoded().as_ref());
+        match v {
+            Value::Object(map) => {
+                map.remove(key.decoded().as_ref());
+            },
+            Value::Array(vec) => {
+                if let Index::Num(idx) = key.to_index()? {
+                    vec.get(idx).ok_or(PatchError::OutOfBounds(idx))?;
+                    vec.remove(idx);
+                } else {
+                    return Err(PatchError::UnexpectedType(key.to_string()));
+                }
+            },
+            _ => {
+                return Err(PatchError::UnexpectedType(path.to_string()));
+            },
+        }
     }
 
     Ok(())
@@ -364,6 +377,49 @@ mod tests {
     }
 
     #[rstest]
+    fn test_patch_ext_add_vec1(mut data: Value) {
+        let path = format_ptr!("/foo/1");
+        let res = patch_ext(&mut data, add_operation(path, json!(42)));
+        assert_ok!(res);
+        assert_eq!(
+            data,
+            json!({
+                "foo": [
+                    {"baz": {"buzz": 0}},
+                    42,
+                    {"baz": {"quzz": 1}},
+                    {"baz": {"fixx": 2}},
+                ],
+            })
+        );
+    }
+
+    #[rstest]
+    fn test_patch_ext_add_vec2(mut data: Value) {
+        let path = format_ptr!("/foo/-");
+        let res = patch_ext(&mut data, add_operation(path, json!(42)));
+        assert_ok!(res);
+        assert_eq!(
+            data,
+            json!({
+                "foo": [
+                    {"baz": {"buzz": 0}},
+                    {"baz": {"quzz": 1}},
+                    {"baz": {"fixx": 2}},
+                    42,
+                ],
+            })
+        );
+    }
+
+    #[rstest]
+    fn test_patch_ext_add_vec_err(mut data: Value) {
+        let path = format_ptr!("/foo/a");
+        let res = patch_ext(&mut data, add_operation(path, json!(42)));
+        assert_err!(res);
+    }
+
+    #[rstest]
     fn test_patch_ext_add_escaped() {
         let path = format_ptr!("/foo/bar/{}", escape("testing.sh/baz"));
         let mut data = json!({});
@@ -390,10 +446,44 @@ mod tests {
     }
 
     #[rstest]
+    fn test_patch_ext_replace_vec1(mut data: Value) {
+        let path = format_ptr!("/foo/1");
+        let res = patch_ext(&mut data, replace_operation(path, json!(42)));
+        assert_ok!(res);
+        assert_eq!(
+            data,
+            json!({
+                "foo": [
+                    {"baz": {"buzz": 0}},
+                    42,
+                    {"baz": {"fixx": 2}},
+                ],
+            })
+        );
+    }
+
+    #[rstest]
+    fn test_patch_ext_replace_vec2(mut data: Value) {
+        let path = format_ptr!("/foo/-");
+        let res = patch_ext(&mut data, replace_operation(path, json!(42)));
+        assert_ok!(res);
+        assert_eq!(
+            data,
+            json!({
+                "foo": [
+                    {"baz": {"buzz": 0}},
+                    {"baz": {"quzz": 1}},
+                    {"baz": {"fixx": 2}},
+                    42,
+                ],
+            })
+        );
+    }
+
+    #[rstest]
     fn test_patch_ext_replace_err(mut data: Value) {
         let path = format_ptr!("/foo/*/baz/buzz");
         let res = patch_ext(&mut data, replace_operation(path, json!(42)));
-        println!("{data:?}");
         assert_err!(res);
     }
 
@@ -412,5 +502,28 @@ mod tests {
                 ],
             })
         );
+    }
+
+    #[rstest]
+    fn test_patch_ext_remove_vec(mut data: Value) {
+        let path = format_ptr!("/foo/1");
+        let res = patch_ext(&mut data, remove_operation(path));
+        assert_ok!(res);
+        assert_eq!(
+            data,
+            json!({
+                "foo": [
+                    {"baz": {"buzz": 0}},
+                    {"baz": {"fixx": 2}},
+                ],
+            })
+        );
+    }
+
+    #[rstest]
+    fn test_patch_ext_remove_vec_err(mut data: Value) {
+        let path = format_ptr!("/foo/-");
+        let res = patch_ext(&mut data, remove_operation(path));
+        assert_err!(res);
     }
 }
