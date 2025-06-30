@@ -1,4 +1,4 @@
-use jsonptr::assign::AssignError;
+use jsonptr::assign;
 use jsonptr::index::ParseIndexError;
 use jsonptr::resolve::ResolveError;
 pub use thiserror::Error;
@@ -21,7 +21,7 @@ pub enum PatchError {
     ResolveError(#[from] ResolveError),
 
     #[error("json path assign error: {0}")]
-    AssignError(#[from] AssignError),
+    AssignError(#[from] assign::Error),
 
     #[error("index parse error: {0}")]
     ParseIndexError(#[from] ParseIndexError),
