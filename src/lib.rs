@@ -51,24 +51,14 @@ pub use jsonptr::{
     Token,
 };
 use serde_json::{
-    json,
     Value,
+    json,
 };
 
 pub use crate::errors::PatchError;
 
 pub mod prelude {
     pub use super::{
-        add_operation,
-        copy_operation,
-        escape,
-        format_ptr,
-        matches,
-        move_operation,
-        patch_ext,
-        remove_operation,
-        replace_operation,
-        test_operation,
         AddOperation,
         CopyOperation,
         MoveOperation,
@@ -81,6 +71,16 @@ pub mod prelude {
         ReplaceOperation,
         TestOperation,
         Token,
+        add_operation,
+        copy_operation,
+        escape,
+        format_ptr,
+        matches,
+        move_operation,
+        patch_ext,
+        remove_operation,
+        replace_operation,
+        test_operation,
     };
 }
 
