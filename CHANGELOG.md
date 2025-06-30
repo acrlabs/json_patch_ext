@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 Breaking changes are annotated with the ⚠️ symbol.
+## 0.3.0 - 2025-06-30
+
+### 🚀 Features
+
+- Update to rust 2024
+
 ## 0.2.2 - 2025-03-28
 
 ### 🐛 Bug Fixes
