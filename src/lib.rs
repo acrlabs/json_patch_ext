@@ -44,7 +44,7 @@ pub use json_patch::{
     TestOperation,
 };
 #[doc(no_inline)]
-use jsonptr::index::Index;
+pub use jsonptr::index::Index;
 pub use jsonptr::{
     Pointer,
     PointerBuf,
