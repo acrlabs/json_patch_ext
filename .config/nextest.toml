@@ -1,0 +1,6 @@
+[profile.default]
+default-filter = 'not test(itest::)'
+slow-timeout = { period = '1s' }
+
+[profile.itest]
+default-filter = 'test(itest::)'

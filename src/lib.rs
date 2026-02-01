@@ -155,7 +155,7 @@ pub fn matches<'a>(path: &Pointer, value: &'a Value) -> Vec<(PointerBuf, &'a Val
             let subpaths = matches(c, v);
             res.extend(subpaths.iter().map(|(p, v)| (head.concat(&idx_path.concat(p)), *v)));
         } else {
-            panic!("cons can't be root");
+            unreachable!("cons can't be root");
         }
     }
     res
@@ -171,7 +171,7 @@ pub fn patch_ext(obj: &mut Value, p: PatchOperation) -> Result<(), PatchError> {
     Ok(())
 }
 
-fn add_or_replace(obj: &mut Value, path: &PointerBuf, value: &Value, replace: bool) -> Result<(), PatchError> {
+fn add_or_replace(obj: &mut Value, path: &Pointer, value: &Value, replace: bool) -> Result<(), PatchError> {
     let Some((subpath, tail)) = path.split_back() else {
         return Ok(());
     };
@@ -210,8 +210,9 @@ fn add_or_replace(obj: &mut Value, path: &PointerBuf, value: &Value, replace: bo
     Ok(())
 }
 
-fn remove(obj: &mut Value, path: &PointerBuf) -> Result<(), PatchError> {
+fn remove(obj: &mut Value, path: &Pointer) -> Result<(), PatchError> {
     let Some((subpath, key)) = path.split_back() else {
+        *obj = Value::Null;
         return Ok(());
     };
 
@@ -221,7 +222,9 @@ fn remove(obj: &mut Value, path: &PointerBuf) -> Result<(), PatchError> {
                 map.remove(key.decoded().as_ref());
             },
             Value::Array(vec) => {
-                if let Index::Num(idx) = key.to_index()? {
+                if key.decoded() == "*" {
+                    vec.clear();
+                } else if let Index::Num(idx) = key.to_index()? {
                     vec.get(idx).ok_or(PatchError::OutOfBounds(idx))?;
                     vec.remove(idx);
                 } else {
@@ -286,7 +289,7 @@ fn patch_ext_helper<'a>(
         if let Some((_, c)) = cons.split_front() {
             res.extend(patch_ext_helper(c, v, mode)?);
         } else {
-            panic!("cons can't be root");
+            unreachable!("cons can't be root");
         }
     }
     Ok(res)
@@ -488,6 +491,14 @@ mod tests {
     }
 
     #[rstest]
+    fn test_patch_ext_remove_root(mut data: Value) {
+        let path = format_ptr!("");
+        let res = patch_ext(&mut data, remove_operation(path));
+        assert_ok!(res);
+        assert_eq!(data, json!(null));
+    }
+
+    #[rstest]
     fn test_patch_ext_remove(mut data: Value) {
         let path = format_ptr!("/foo/*/baz/quzz");
         let res = patch_ext(&mut data, remove_operation(path));
@@ -502,6 +513,27 @@ mod tests {
                 ],
             })
         );
+    }
+
+    #[rstest]
+    fn test_patch_ext_remove_wildcard(mut data: Value) {
+        let path = format_ptr!("/foo/*");
+        let res = patch_ext(&mut data, remove_operation(path));
+        assert_ok!(res);
+        assert_eq!(data, json!({"foo": []}));
+    }
+
+    #[rstest]
+    fn test_patch_ext_remove_nested_wildcards() {
+        let mut data = json!([[
+            [{"bar": "baz"}, {"qwerty": "yuiop"}],
+            [{"fuzz": "quzz"}],
+            [{"asdf": "hjkl"}],
+        ]]);
+        let path = format_ptr!("/*/*/*");
+        let res = patch_ext(&mut data, remove_operation(path));
+        assert_ok!(res);
+        assert_eq!(data, json!([[[], [], []]]));
     }
 
     #[rstest]
