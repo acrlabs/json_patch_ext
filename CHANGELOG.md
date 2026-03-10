@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 Breaking changes are annotated with the ⚠️ symbol.
+## 0.3.3 - 2026-03-10
+
+### 🐛 Bug Fixes
+
+- Make ResolveError public in prelude
+
 ## 0.3.2 - 2026-02-01
 
 ### 🐛 Bug Fixes
