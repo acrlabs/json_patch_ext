@@ -45,6 +45,7 @@ pub use json_patch::{
 };
 #[doc(no_inline)]
 pub use jsonptr::index::Index;
+pub use jsonptr::resolve::ResolveError;
 pub use jsonptr::{
     Pointer,
     PointerBuf,
@@ -69,6 +70,7 @@ pub mod prelude {
         PointerBuf,
         RemoveOperation,
         ReplaceOperation,
+        ResolveError,
         TestOperation,
         Token,
         add_operation,
