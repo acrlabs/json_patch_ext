@@ -20,3 +20,11 @@ repos:
     hooks:
       - id: fmt
         args: ['--', '--unstable-features']
+  - repo: "https://github.com/zizmorcore/zizmor-pre-commit"
+    rev: v1.23.1
+    hooks:
+      - id: zizmor
+        args:
+          - --fix=all
+          - --config
+          - .config/zizmor.yml
